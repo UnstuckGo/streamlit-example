@@ -5,32 +5,44 @@ import pandas as pd
 import streamlit as st
 
 """
-# streamlit_app.py
-
 import streamlit as st
-from google.oauth2 import service_account
-from gsheetsdb import connect
+import pandas as pd
+import gspread
+import matplotlib.pyplot as plt
+from oauth2client.service_account import ServiceAccountCredentials
 
-# Create a connection object.
-credentials = service_account.Credentials.from_service_account_info(
-    st.secrets["gcp_service_account"],
-    scopes=[
-        "https://www.googleapis.com/auth/spreadsheets",
-    ],
-)
-conn = connect(credentials=credentials)
+# Define Google Sheets API auth
+scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
+creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
+client = gspread.authorize(creds)
 
-# Perform SQL query on the Google Sheet.
-# Uses st.cache_data to only rerun when the query changes or after 10 min.
-@st.cache_data(ttl=600)
-def run_query(query):
-    rows = conn.execute(query, headers=1)
-    rows = rows.fetchall()
-    return rows
+# Load the Google Spreadsheet Data into a DataFrame
+sheet = client.open("Test").sheet1
+data = sheet.get_all_records()
+df = pd.DataFrame(data)
 
-sheet_url = st.secrets["private_gsheets_url"]
-rows = run_query(f'SELECT * FROM "{sheet_url}"')
+# Calculate the 3 month moving average
+df['Moving_Average_Spend'] = df['Average Spend'].rolling(window=3).mean()
+df['Moving_Average_Transactions'] = df['Transactions'].rolling(window=3).mean()
+df['Moving_Average_Guests'] = df['Guests'].rolling(window=3).mean()
 
-# Print results.
-for row in rows:
-    st.write(f"{row.name} has a :{row.pet}:")
+# Streamlit App Layout
+st.title('Marketing Data Dashboard')
+
+st.header('Average Spend')
+# Plot average spend
+plt.figure(figsize=(10,5))
+plt.plot(df.index, df['Average Spend'], marker='', color='green', linewidth=2, label="Average Spend")
+plt.title('Average Spend Over Time')
+plt.xlabel('Months')
+plt.ylabel('Average Spend')
+st.pyplot()
+
+# Display the 3 month moving averages
+st.header('3 Month Moving Averages')
+st.markdown('**Average Spend:** ${}'.format(df['Moving_Average_Spend'].iloc[-1]))
+st.markdown('**Transactions:** {}'.format(df['Moving_Average_Transactions'].iloc[-1]))
+st.markdown('**Guests:** {}'.format(df['Moving_Average_Guests'].iloc[-1]))
+
+# Add more sections as needed for other metrics (Transactions, Guests, etc.)
+# ...
