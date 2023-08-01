@@ -1,3 +1,6 @@
 altair
 pandas
 streamlit
+
+# requirements.txt
+gsheetsdb==2.0.0
